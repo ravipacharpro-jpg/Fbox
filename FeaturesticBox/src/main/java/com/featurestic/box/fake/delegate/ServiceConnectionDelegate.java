@@ -1,6 +1,5 @@
 package com.featurestic.box.fake.delegate;
 
-import android.app.IBinderSession;
 import android.app.IServiceConnection;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -60,10 +59,6 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
     }
 
     public void connected(ComponentName name, IBinder service, IBinder session, boolean dead) throws RemoteException {
-        connected(name, service, (Object) session, dead);
-    }
-
-    public void connected(ComponentName name, IBinder service, IBinderSession session, boolean dead) throws RemoteException {
         connected(name, service, (Object) session, dead);
     }
 

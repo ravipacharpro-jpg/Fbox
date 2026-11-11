@@ -1,6 +1,5 @@
 package com.featurestic.box.compat.auth;
 
-import android.app.IBinderSession;
 import android.app.IServiceConnection;
 import android.content.ComponentName;
 import android.os.IBinder;
@@ -63,11 +62,6 @@ public final class ExternalAuthServiceConnectionDelegate extends IServiceConnect
     }
 
     public void connected(ComponentName name, IBinder service, IBinder session, boolean dead)
-            throws RemoteException {
-        connected(name, service, (Object) session, dead);
-    }
-
-    public void connected(ComponentName name, IBinder service, IBinderSession session, boolean dead)
             throws RemoteException {
         connected(name, service, (Object) session, dead);
     }
