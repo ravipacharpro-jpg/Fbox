@@ -90,6 +90,8 @@ typedef void *(*android_dlopen_ext_fn_t)(const char *, int, const android_dlexti
 
 loader_dlopen_fn_t orig_loader_dlopen = nullptr;
 loader_android_dlopen_ext_fn_t orig_loader_android_dlopen_ext = nullptr;
+loader_dlopen_fn_t g_real_loader_dlopen = nullptr;
+loader_android_dlopen_ext_fn_t g_real_loader_android_dlopen_ext = nullptr;
 dlopen_fn_t orig_dlopen = nullptr;
 android_dlopen_ext_fn_t orig_android_dlopen_ext = nullptr;
 
@@ -440,7 +442,9 @@ static void notifyGameLibraryLoadedNative(const char *libPathOrName) {
             }
         }
         if (env != nullptr) {
-            jclass rnativeCls = env->FindClass(VMCORE_CLASS);
+            jclass cachedCls = BoxCore::getNativeCoreClass();
+            jclass localCls = cachedCls ? nullptr : env->FindClass(VMCORE_CLASS);
+            jclass rnativeCls = cachedCls ? cachedCls : localCls;
             if (rnativeCls) {
                 jmethodID mid = env->GetStaticMethodID(rnativeCls, "onGameLibraryLoaded", "(Ljava/lang/String;)V");
                 if (mid) {
@@ -450,7 +454,9 @@ static void notifyGameLibraryLoadedNative(const char *libPathOrName) {
                         env->DeleteLocalRef(jPath);
                     }
                 }
-                env->DeleteLocalRef(rnativeCls);
+            }
+            if (localCls) {
+                env->DeleteLocalRef(localCls);
             }
             if (env->ExceptionCheck()) {
                 env->ExceptionClear();
@@ -489,24 +495,32 @@ static void *my_loader_android_dlopen_ext(
     return handle;
 }
 
+__attribute__((noinline))
 static void *my_dlopen(const char *filename, int flags) {
+    const void *callerAddr = __builtin_return_address(0);
     char buf[PATH_MAX];
     const char *target = (filename && filename[0] == '/')
             ? IO::redirectPathBuf(filename, buf, sizeof(buf))
             : filename;
-    void *handle = orig_dlopen(target, flags);
+    void *handle = g_real_loader_dlopen
+            ? g_real_loader_dlopen(target, flags, callerAddr)
+            : (orig_dlopen ? orig_dlopen(target, flags) : nullptr);
     if (handle != nullptr && target != nullptr) {
         notifyGameLibraryLoadedNative(target);
     }
     return handle;
 }
 
+__attribute__((noinline))
 static void *my_android_dlopen_ext(const char *filename, int flags, const android_dlextinfo *extinfo) {
+    const void *callerAddr = __builtin_return_address(0);
     char buf[PATH_MAX];
     const char *target = (filename && filename[0] == '/')
             ? IO::redirectPathBuf(filename, buf, sizeof(buf))
             : filename;
-    void *handle = orig_android_dlopen_ext(target, flags, extinfo);
+    void *handle = g_real_loader_android_dlopen_ext
+            ? g_real_loader_android_dlopen_ext(target, flags, extinfo, callerAddr)
+            : (orig_android_dlopen_ext ? orig_android_dlopen_ext(target, flags, extinfo) : nullptr);
     if (handle != nullptr && target != nullptr) {
         notifyGameLibraryLoadedNative(target);
     }
@@ -616,6 +630,24 @@ static void installSignalGuardAndHook() {
     }
 }
 
+static void *resolveSymbolAny(void *handle, const char *nameA, const char *nameB) {
+    void *sym = nullptr;
+    if (handle) {
+        if (nameA) {
+            sym = xdl_sym(handle, nameA, nullptr);
+            if (!sym) sym = xdl_dsym(handle, nameA, nullptr);
+        }
+        if (!sym && nameB) {
+            sym = xdl_sym(handle, nameB, nullptr);
+            if (!sym) sym = xdl_dsym(handle, nameB, nullptr);
+        }
+    }
+    if (!sym && nameB) {
+        sym = dlsym(RTLD_DEFAULT, nameB);
+    }
+    return sym;
+}
+
 static void installNativeDlopenHooks() {
 #if defined(__LP64__)
     const char *linkerName = "linker64";
@@ -625,6 +657,11 @@ static void installNativeDlopenHooks() {
     void *linkerHandle = xdl_open(linkerName, XDL_DEFAULT);
     bool hookedLoaderDlopen = false;
     bool hookedLoaderExt = false;
+
+    g_real_loader_dlopen = reinterpret_cast<loader_dlopen_fn_t>(
+            resolveSymbolAny(linkerHandle, "__dl___loader_dlopen", "__loader_dlopen"));
+    g_real_loader_android_dlopen_ext = reinterpret_cast<loader_android_dlopen_ext_fn_t>(
+            resolveSymbolAny(linkerHandle, "__dl___loader_android_dlopen_ext", "__loader_android_dlopen_ext"));
 
     if (linkerHandle) {
         hookedLoaderDlopen = tryHookSymbol(
@@ -654,23 +691,15 @@ static void installNativeDlopenHooks() {
     if (!hookedLoaderDlopen || !hookedLoaderExt) {
         void *libdl = xdl_open("libdl.so", XDL_DEFAULT);
         if (libdl) {
-            if (!hookedLoaderDlopen) {
-                if (!tryHookSymbol(libdl, "__loader_dlopen",
-                                   reinterpret_cast<void *>(my_loader_dlopen),
-                                   reinterpret_cast<void **>(&orig_loader_dlopen))) {
-                    tryHookSymbol(libdl, "dlopen",
-                                  reinterpret_cast<void *>(my_dlopen),
-                                  reinterpret_cast<void **>(&orig_dlopen));
-                }
+            if (!hookedLoaderDlopen && g_real_loader_dlopen != nullptr) {
+                tryHookSymbol(libdl, "dlopen",
+                              reinterpret_cast<void *>(my_dlopen),
+                              reinterpret_cast<void **>(&orig_dlopen));
             }
-            if (!hookedLoaderExt) {
-                if (!tryHookSymbol(libdl, "__loader_android_dlopen_ext",
-                                   reinterpret_cast<void *>(my_loader_android_dlopen_ext),
-                                   reinterpret_cast<void **>(&orig_loader_android_dlopen_ext))) {
-                    tryHookSymbol(libdl, "android_dlopen_ext",
-                                  reinterpret_cast<void *>(my_android_dlopen_ext),
-                                  reinterpret_cast<void **>(&orig_android_dlopen_ext));
-                }
+            if (!hookedLoaderExt && g_real_loader_android_dlopen_ext != nullptr) {
+                tryHookSymbol(libdl, "android_dlopen_ext",
+                              reinterpret_cast<void *>(my_android_dlopen_ext),
+                              reinterpret_cast<void **>(&orig_android_dlopen_ext));
             }
             xdl_close(libdl);
         }

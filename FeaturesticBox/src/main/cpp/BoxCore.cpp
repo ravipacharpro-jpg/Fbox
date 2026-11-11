@@ -75,6 +75,10 @@ JavaVM *BoxCore::getJavaVM() {
     return VMEnv.vm;
 }
 
+jclass BoxCore::getNativeCoreClass() {
+    return VMEnv.NativeCoreClass;
+}
+
 jlongArray BoxCore::loadEmptyDex(JNIEnv *env) {
     return env ? env->NewLongArray(0) : nullptr;
 }
