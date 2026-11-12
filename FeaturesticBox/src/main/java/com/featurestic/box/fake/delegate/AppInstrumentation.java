@@ -164,6 +164,74 @@ public final class AppInstrumentation extends BaseInstrumentationDelegate implem
 			}
 			ActivityManagerCompat.setActivityOrientation(activity, info.screenOrientation);
 		}
+		enforceLandscapeMetricsIfTarget(activity, info);
+	}
+
+	private static void enforceLandscapeMetricsIfTarget(Activity activity, ActivityInfo info) {
+		if (activity == null) return;
+		try {
+			String pkg = activity.getPackageName();
+			boolean isLandscape = (pkg != null && (pkg.startsWith("com.pubg.")
+					|| "com.tencent.ig".equals(pkg)
+					|| "com.rekoo.pubgm".equals(pkg)
+					|| "com.vng.pubgmobile".equals(pkg)))
+					|| (info != null && (info.screenOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+					|| info.screenOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+					|| info.screenOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+					|| info.screenOrientation == ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE));
+			if (!isLandscape) {
+				int ori = activity.getRequestedOrientation();
+				isLandscape = (ori == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+						|| ori == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+						|| ori == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+						|| ori == ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
+			}
+			if (isLandscape) {
+				android.content.res.Resources res = activity.getResources();
+				if (res != null) {
+					android.util.DisplayMetrics dm = res.getDisplayMetrics();
+					if (dm != null && dm.widthPixels < dm.heightPixels) {
+						int max = Math.max(dm.widthPixels, dm.heightPixels);
+						int min = Math.min(dm.widthPixels, dm.heightPixels);
+						dm.widthPixels = max;
+						dm.heightPixels = min;
+						android.content.res.Configuration config = res.getConfiguration();
+						if (config != null) {
+							config.orientation = android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+							config.screenWidthDp = (int) (max / (dm.density > 0 ? dm.density : 1.0f));
+							config.screenHeightDp = (int) (min / (dm.density > 0 ? dm.density : 1.0f));
+							res.updateConfiguration(config, dm);
+						}
+					}
+				}
+				android.util.DisplayMetrics sysDm = android.content.res.Resources.getSystem().getDisplayMetrics();
+				if (sysDm != null && sysDm.widthPixels < sysDm.heightPixels) {
+					int max = Math.max(sysDm.widthPixels, sysDm.heightPixels);
+					int min = Math.min(sysDm.widthPixels, sysDm.heightPixels);
+					sysDm.widthPixels = max;
+					sysDm.heightPixels = min;
+				}
+				if (activity.getApplication() != null) {
+					android.content.res.Resources appRes = activity.getApplication().getResources();
+					if (appRes != null) {
+						android.util.DisplayMetrics appDm = appRes.getDisplayMetrics();
+						if (appDm != null && appDm.widthPixels < appDm.heightPixels) {
+							int max = Math.max(appDm.widthPixels, appDm.heightPixels);
+							int min = Math.min(appDm.widthPixels, appDm.heightPixels);
+							appDm.widthPixels = max;
+							appDm.heightPixels = min;
+							android.content.res.Configuration appConfig = appRes.getConfiguration();
+							if (appConfig != null) {
+								appConfig.orientation = android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+								appRes.updateConfiguration(appConfig, appDm);
+							}
+						}
+					}
+				}
+				com.featurestic.box.fake.service.IDisplayManagerProxy.flushDisplayInfoCache();
+			}
+		} catch (Throwable ignored) {
+		}
 	}
 
 	@Override
@@ -228,6 +296,7 @@ public final class AppInstrumentation extends BaseInstrumentationDelegate implem
 		super.callActivityOnResume(activity);
 		NetworkLowLatencyOptimizer.acquireWifiLowLatencyLock(activity);
 		FeaturesticBatteryAndOemGuard.onGameResumed(activity);
+		enforceLandscapeMetricsIfTarget(activity, null);
 	}
 
 	@Override

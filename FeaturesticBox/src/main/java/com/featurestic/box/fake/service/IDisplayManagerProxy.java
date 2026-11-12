@@ -75,19 +75,62 @@ public class IDisplayManagerProxy extends ClassInvocationStub {
         return result;
     }
 
+    private static boolean isLandscapeContext() {
+        try {
+            String pkg = null;
+            if (com.featurestic.box.app.BActivityThread.isThreadInit()) {
+                pkg = com.featurestic.box.app.BActivityThread.getAppPackageName();
+            }
+            if (pkg != null && (pkg.startsWith("com.pubg.")
+                    || "com.tencent.ig".equals(pkg)
+                    || "com.rekoo.pubgm".equals(pkg)
+                    || "com.vng.pubgmobile".equals(pkg))) {
+                return true;
+            }
+            android.app.Activity top = com.featurestic.box.app.BActivityThread.getTopActivity();
+            if (top != null) {
+                int o = top.getRequestedOrientation();
+                if (o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static void patchDisplayInfoForTargetHz(Object displayInfo, float requestedFps) {
         if (displayInfo == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         Class<?> cls = displayInfo.getClass();
         float targetFps = requestedFps;
 
-        // 1. Inspect supportedModes & ensure a 120Hz (or higher hardware max) Display.Mode exists
         try {
+            int logicalW = getIntField(displayInfo, cls, "logicalWidth", 1080);
+            int logicalH = getIntField(displayInfo, cls, "logicalHeight", 2400);
+
+            boolean isLandscape = isLandscapeContext();
+            int maxDim = Math.max(logicalW, logicalH);
+            int minDim = Math.min(logicalW, logicalH);
+
+            if (isLandscape) {
+                setIntField(displayInfo, cls, "logicalWidth", maxDim);
+                setIntField(displayInfo, cls, "logicalHeight", minDim);
+                setIntField(displayInfo, cls, "appWidth", maxDim);
+                setIntField(displayInfo, cls, "appHeight", minDim);
+                setIntField(displayInfo, cls, "largestNominalAppWidth", maxDim);
+                setIntField(displayInfo, cls, "largestNominalAppHeight", minDim);
+                setIntField(displayInfo, cls, "smallestNominalAppWidth", minDim);
+                setIntField(displayInfo, cls, "smallestNominalAppHeight", minDim);
+                setIntField(displayInfo, cls, "rotation", 1); // Surface.ROTATION_90
+            }
+
             Field modesField = findFieldRecursive(cls, "supportedModes");
             if (modesField != null) {
                 modesField.setAccessible(true);
                 Display.Mode[] modes = (Display.Mode[]) modesField.get(displayInfo);
-                int logicalW = getIntField(displayInfo, cls, "logicalWidth", 1080);
-                int logicalH = getIntField(displayInfo, cls, "logicalHeight", 2400);
 
                 Display.Mode bestMode = null;
                 float maxRate = 0f;
@@ -104,12 +147,11 @@ public class IDisplayManagerProxy extends ClassInvocationStub {
                     targetFps = maxRate;
                 }
 
-                // If hardware modes only go up to 60Hz/90Hz, synthesize a 120Hz Display.Mode
-                // so Unreal Engine / Unity sees a valid 120Hz mode in Display.getSupportedModes() & Display.getMode()!
-                if (bestMode == null || bestMode.getRefreshRate() < 118.0f) {
-                    int w = (bestMode != null) ? bestMode.getPhysicalWidth() : logicalW;
-                    int h = (bestMode != null) ? bestMode.getPhysicalHeight() : logicalH;
-                    Display.Mode synth120 = createDisplayMode(999, w, h, 120.0f);
+                int w = isLandscape ? maxDim : ((bestMode != null) ? bestMode.getPhysicalWidth() : logicalW);
+                int h = isLandscape ? minDim : ((bestMode != null) ? bestMode.getPhysicalHeight() : logicalH);
+
+                if (bestMode == null || bestMode.getRefreshRate() < 118.0f || (isLandscape && bestMode.getPhysicalWidth() < bestMode.getPhysicalHeight())) {
+                    Display.Mode synth120 = createDisplayMode(999, w, h, (targetFps >= 90) ? targetFps : 120.0f);
                     if (synth120 != null) {
                         bestMode = synth120;
                         if (modes != null) {
@@ -137,13 +179,12 @@ public class IDisplayManagerProxy extends ClassInvocationStub {
         } catch (Throwable ignored) {
         }
 
-        // 2. Patch Android 11-16 refreshRateOverride & renderFrameRate (used by Display.getRefreshRate() & FramePacer!)
-        setFloatField(displayInfo, cls, "refreshRateOverride", targetFps);
-        setFloatField(displayInfo, cls, "renderFrameRate", targetFps);
-
-        // 3. Patch 120Hz VSYNC presentation deadline (8.33ms = 8,333,333 ns)
-        setLongField(displayInfo, cls, "presentationDeadlineNanos", 8333333L);
-        setLongField(displayInfo, cls, "appVsyncOffsetNanos", 1000000L);
+        if (targetFps >= 90) {
+            setFloatField(displayInfo, cls, "refreshRateOverride", targetFps);
+            setFloatField(displayInfo, cls, "renderFrameRate", targetFps);
+            setLongField(displayInfo, cls, "presentationDeadlineNanos", 8333333L);
+            setLongField(displayInfo, cls, "appVsyncOffsetNanos", 1000000L);
+        }
     }
 
     private static Display.Mode createDisplayMode(int modeId, int width, int height, float refreshRate) {
