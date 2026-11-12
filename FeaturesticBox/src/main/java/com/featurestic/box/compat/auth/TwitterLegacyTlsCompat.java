@@ -518,14 +518,22 @@ public final class TwitterLegacyTlsCompat {
         if (intent == null || cl == null) return;
         intent.setExtrasClassLoader(cl);
         android.os.Bundle extras = intent.getExtras();
-        if (extras == null) return;
+        if (extras == null) {
+            android.util.Log.w("FeaturesticSignIn", "rebind: extras is null");
+            return;
+        }
         android.os.Bundle freshExtras = rebindBundleClassLoader(extras, cl);
         try {
             for (String key : freshExtras.keySet()) {
                 Object val = freshExtras.get(key);
+                android.util.Log.w("FeaturesticSignIn", "rebind key=" + key + " type=" + (val == null ? "null" : val.getClass().getName()));
                 if (val instanceof android.os.Bundle) {
                     android.os.Bundle rebound = rebindBundleClassLoader((android.os.Bundle) val, cl);
                     freshExtras.putBundle(key, rebound);
+                    for (String ik : rebound.keySet()) {
+                        Object iv = rebound.get(ik);
+                        android.util.Log.w("FeaturesticSignIn", "rebind inner=" + ik + " type=" + (iv == null ? "null" : iv.getClass().getName()));
+                    }
                 }
             }
         } catch (Throwable t) {
