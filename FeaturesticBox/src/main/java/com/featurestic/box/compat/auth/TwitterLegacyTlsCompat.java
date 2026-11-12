@@ -255,23 +255,30 @@ public final class TwitterLegacyTlsCompat {
             bar.setTag(CONTROL_BAR_TAG);
             bar.setOrientation(LinearLayout.HORIZONTAL);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            int padH = dp(activity, 8);
+            int padH = dp(activity, 6);
             int padV = dp(activity, 5);
             bar.setPadding(padH, padV, padH, padV);
 
             GradientDrawable barBg = new GradientDrawable();
-            barBg.setColor(Color.parseColor("#EB1C1C1E"));
-            barBg.setCornerRadius(dp(activity, 18));
-            barBg.setStroke(dp(activity, 1), Color.parseColor("#0A84FF"));
+            barBg.setColor(Color.parseColor("#E6141416"));
+            barBg.setCornerRadius(dp(activity, 20));
+            barBg.setStroke(dp(activity, 1), Color.parseColor("#44FFFFFF"));
             bar.setBackground(barBg);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                bar.setElevation(dp(activity, 10));
+            }
 
             if (isTwitterFlow) {
                 TextView authBtn = new TextView(activity);
                 authBtn.setText("Authorize");
-                authBtn.setTextColor(Color.parseColor("#30D158"));
-                authBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
+                authBtn.setTextColor(Color.WHITE);
+                authBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
                 authBtn.setTypeface(Typeface.DEFAULT_BOLD);
-                authBtn.setPadding(dp(activity, 8), dp(activity, 3), dp(activity, 8), dp(activity, 3));
+                authBtn.setPadding(dp(activity, 10), dp(activity, 5), dp(activity, 10), dp(activity, 5));
+                GradientDrawable authBg = new GradientDrawable();
+                authBg.setColor(Color.parseColor("#28CD41"));
+                authBg.setCornerRadius(dp(activity, 14));
+                authBtn.setBackground(authBg);
                 authBtn.setOnClickListener(v -> {
                     try {
                         WebViewCompat.syncTwitterAndXCookies();
@@ -286,15 +293,22 @@ public final class TwitterLegacyTlsCompat {
                     } catch (Throwable ignored) {
                     }
                 });
-                bar.addView(authBtn);
+                LinearLayout.LayoutParams authLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                authLp.rightMargin = dp(activity, 6);
+                bar.addView(authBtn, authLp);
             }
 
             TextView switchIdBtn = new TextView(activity);
             switchIdBtn.setText("Switch ID");
-            switchIdBtn.setTextColor(Color.parseColor("#0A84FF"));
-            switchIdBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
+            switchIdBtn.setTextColor(Color.WHITE);
+            switchIdBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
             switchIdBtn.setTypeface(Typeface.DEFAULT_BOLD);
-            switchIdBtn.setPadding(dp(activity, 8), dp(activity, 3), dp(activity, 8), dp(activity, 3));
+            switchIdBtn.setPadding(dp(activity, 12), dp(activity, 5), dp(activity, 12), dp(activity, 5));
+            GradientDrawable switchBg = new GradientDrawable();
+            switchBg.setColor(Color.parseColor("#0A84FF"));
+            switchBg.setCornerRadius(dp(activity, 14));
+            switchIdBtn.setBackground(switchBg);
             switchIdBtn.setOnClickListener(v -> {
                 try {
                     String reloadUrl = savedAuthorizeUrl[0];
@@ -316,15 +330,53 @@ public final class TwitterLegacyTlsCompat {
                 } catch (Throwable ignored) {
                 }
             });
-            bar.addView(switchIdBtn);
+            LinearLayout.LayoutParams switchLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            switchLp.rightMargin = dp(activity, 6);
+            bar.addView(switchIdBtn, switchLp);
 
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+            TextView closeBtn = new TextView(activity);
+            closeBtn.setText("✕");
+            closeBtn.setTextColor(Color.WHITE);
+            closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+            closeBtn.setTypeface(Typeface.DEFAULT_BOLD);
+            closeBtn.setPadding(dp(activity, 9), dp(activity, 5), dp(activity, 9), dp(activity, 5));
+            GradientDrawable closeBg = new GradientDrawable();
+            closeBg.setColor(Color.parseColor("#3A3A3C"));
+            closeBg.setCornerRadius(dp(activity, 14));
+            closeBtn.setBackground(closeBg);
+            closeBtn.setOnClickListener(v -> {
+                try {
+                    activity.finish();
+                } catch (Throwable ignored) {
+                }
+            });
+            bar.addView(closeBtn);
+
+            final int baseTop = dp(activity, 10);
+            final int baseEnd = dp(activity, 10);
+            final FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.TOP | Gravity.END);
-            lp.topMargin = dp(activity, 12);
-            lp.rightMargin = dp(activity, 12);
+            lp.topMargin = baseTop;
+            lp.rightMargin = baseEnd;
             decor.addView(bar, lp);
+            bar.bringToFront();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                decor.setOnApplyWindowInsetsListener((v, insets) -> {
+                    try {
+                        int topInset = insets.getSystemWindowInsetTop();
+                        int rightInset = insets.getSystemWindowInsetRight();
+                        lp.topMargin = baseTop + topInset;
+                        lp.rightMargin = baseEnd + rightInset;
+                        bar.setLayoutParams(lp);
+                    } catch (Throwable ignored) {
+                    }
+                    return insets;
+                });
+                decor.requestApplyInsets();
+            }
         } catch (Throwable ignored) {
         }
     }
@@ -449,11 +501,19 @@ public final class TwitterLegacyTlsCompat {
         try {
             android.view.Window w = activity.getWindow();
             android.util.DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-            int targetW = Math.min(dp(activity, 370), (int) (dm.widthPixels * 0.90f));
-            int targetH = Math.min(dp(activity, 430), (int) (dm.heightPixels * 0.86f));
+            boolean isLandscape = dm.widthPixels > dm.heightPixels;
+            int targetW = isLandscape
+                    ? Math.min(dp(activity, 640), (int) (dm.widthPixels * 0.86f))
+                    : Math.min(dp(activity, 480), (int) (dm.widthPixels * 0.94f));
+            int targetH = isLandscape
+                    ? (int) (dm.heightPixels * 0.92f)
+                    : Math.min(dp(activity, 640), (int) (dm.heightPixels * 0.84f));
             w.setLayout(targetW, targetH);
             w.setGravity(Gravity.CENTER);
-            w.addFlags( android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            w.setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             android.view.WindowManager.LayoutParams lp = w.getAttributes();
             if (lp != null) {
                 lp.dimAmount = 0.72f;
@@ -474,27 +534,37 @@ public final class TwitterLegacyTlsCompat {
                         hubActivity, android.R.style.Theme_Translucent_NoTitleBar);
                 dialog.setCancelable(true);
                 dialog.setCanceledOnTouchOutside(false);
+                if (dialog.getWindow() != null) {
+                    dialog.getWindow().setSoftInputMode(
+                            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                                    | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+                }
 
                 LinearLayout outer = new LinearLayout(hubActivity);
                 outer.setOrientation(LinearLayout.VERTICAL);
                 outer.setGravity(Gravity.CENTER);
                 outer.setBackgroundColor(Color.parseColor("#B8000000"));
-                int outerPad = dp(hubActivity, 16);
+                int outerPad = dp(hubActivity, 10);
                 outer.setPadding(outerPad, outerPad, outerPad, outerPad);
 
                 LinearLayout card = new LinearLayout(hubActivity);
                 card.setOrientation(LinearLayout.VERTICAL);
                 GradientDrawable cardBg = new GradientDrawable();
                 cardBg.setColor(Color.parseColor("#F51C1C1E"));
-                cardBg.setCornerRadius(dp(hubActivity, 22));
+                cardBg.setCornerRadius(dp(hubActivity, 20));
                 cardBg.setStroke(dp(hubActivity, 1), Color.parseColor("#33FFFFFF"));
                 card.setBackground(cardBg);
 
                 android.util.DisplayMetrics dm = hubActivity.getResources().getDisplayMetrics();
-                int cardW = Math.min(dp(hubActivity, 360), (int) (dm.widthPixels * 0.90f));
-                int cardH = Math.min(dp(hubActivity, 410), (int) (dm.heightPixels * 0.86f));
+                boolean isLandscape = dm.widthPixels > dm.heightPixels;
+                int cardW = isLandscape
+                        ? Math.min(dp(hubActivity, 640), (int) (dm.widthPixels * 0.88f))
+                        : Math.min(dp(hubActivity, 480), (int) (dm.widthPixels * 0.94f));
+                int cardH = isLandscape
+                        ? (int) (dm.heightPixels * 0.90f)
+                        : Math.min(dp(hubActivity, 640), (int) (dm.heightPixels * 0.84f));
 
-                // Compact Apple Header Bar
+                // Clear Header Bar with visible pill buttons
                 LinearLayout header = new LinearLayout(hubActivity);
                 header.setOrientation(LinearLayout.HORIZONTAL);
                 header.setGravity(Gravity.CENTER_VERTICAL);
@@ -503,7 +573,7 @@ public final class TwitterLegacyTlsCompat {
                 TextView titleTv = new TextView(hubActivity);
                 titleTv.setText("Google Sign-In");
                 titleTv.setTextColor(Color.WHITE);
-                titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+                titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
                 titleTv.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
                 header.addView(titleTv, new LinearLayout.LayoutParams(
                         0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -511,11 +581,15 @@ public final class TwitterLegacyTlsCompat {
                 final WebView webView = new WebView(hubActivity);
 
                 TextView newIdBtn = new TextView(hubActivity);
-                newIdBtn.setText("New ID");
-                newIdBtn.setTextColor(Color.parseColor("#0A84FF"));
+                newIdBtn.setText("Switch ID");
+                newIdBtn.setTextColor(Color.WHITE);
                 newIdBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
                 newIdBtn.setTypeface(Typeface.DEFAULT_BOLD);
-                newIdBtn.setPadding(dp(hubActivity, 8), dp(hubActivity, 4), dp(hubActivity, 8), dp(hubActivity, 4));
+                newIdBtn.setPadding(dp(hubActivity, 12), dp(hubActivity, 6), dp(hubActivity, 12), dp(hubActivity, 6));
+                GradientDrawable newIdBg = new GradientDrawable();
+                newIdBg.setColor(Color.parseColor("#0A84FF"));
+                newIdBg.setCornerRadius(dp(hubActivity, 14));
+                newIdBtn.setBackground(newIdBg);
                 newIdBtn.setOnClickListener(v -> {
                     WebViewCompat.clearAllWebLoginSessions(hubActivity, webView);
                     java.util.Map<String, String> hdrs = new java.util.HashMap<>();
@@ -525,13 +599,21 @@ public final class TwitterLegacyTlsCompat {
                             hdrs);
                     Toast.makeText(hubActivity, "Session Cleared! Enter Email & Password.", Toast.LENGTH_SHORT).show();
                 });
-                header.addView(newIdBtn);
+                LinearLayout.LayoutParams newIdLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                newIdLp.rightMargin = dp(hubActivity, 8);
+                header.addView(newIdBtn, newIdLp);
 
                 TextView closeBtn = new TextView(hubActivity);
                 closeBtn.setText("Close");
-                closeBtn.setTextColor(Color.parseColor("#8E8E93"));
+                closeBtn.setTextColor(Color.WHITE);
                 closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
-                closeBtn.setPadding(dp(hubActivity, 8), dp(hubActivity, 4), dp(hubActivity, 4), dp(hubActivity, 4));
+                closeBtn.setTypeface(Typeface.DEFAULT_BOLD);
+                closeBtn.setPadding(dp(hubActivity, 12), dp(hubActivity, 6), dp(hubActivity, 12), dp(hubActivity, 6));
+                GradientDrawable closeBg = new GradientDrawable();
+                closeBg.setColor(Color.parseColor("#3A3A3C"));
+                closeBg.setCornerRadius(dp(hubActivity, 14));
+                closeBtn.setBackground(closeBg);
                 closeBtn.setOnClickListener(v -> {
                     dialog.dismiss();
                     deliverGoogleResultDirectlyToHub(hubActivity, Activity.RESULT_CANCELED, null, null);
@@ -543,12 +625,17 @@ public final class TwitterLegacyTlsCompat {
                 div.setBackgroundColor(Color.parseColor("#38383A"));
                 card.addView(div, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
 
+                webView.setFocusable(true);
+                webView.setFocusableInTouchMode(true);
                 WebSettings ws = webView.getSettings();
                 ws.setJavaScriptEnabled(true);
                 ws.setDomStorageEnabled(true);
                 ws.setDatabaseEnabled(true);
                 ws.setUseWideViewPort(true);
                 ws.setLoadWithOverviewMode(true);
+                ws.setSupportZoom(true);
+                ws.setBuiltInZoomControls(true);
+                ws.setDisplayZoomControls(false);
                 ws.setUserAgentString(
                         "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.200 Mobile Safari/537.36");
                 CookieManager cm = CookieManager.getInstance();
@@ -657,7 +744,9 @@ public final class TwitterLegacyTlsCompat {
         return FACEBOOK_ACTIVITY.equals(name)
                 || IMSDK_PROXY_ACTIVITY.equals(name)
                 || name.endsWith(".FacebookActivity")
-                || name.contains("WebDialog");
+                || name.contains("WebDialog")
+                || name.contains("Discord")
+                || name.contains("WebViewActivity");
     }
 
     private static int dp(Activity activity, int value) {
