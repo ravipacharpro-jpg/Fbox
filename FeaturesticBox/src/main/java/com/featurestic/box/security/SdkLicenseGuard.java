@@ -120,11 +120,24 @@ public final class SdkLicenseGuard {
         return verifySync(context, key);
     }
 
+    public static final String KEY_PLUGIN_URL = "plugin_url";
+
+    public static String getPluginUrl(Context context) {
+        if (context == null) return "";
+        try {
+            return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_PLUGIN_URL, "");
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
     public static boolean verifySync(final Context context, final String key) {
         if (key == null || key.trim().isEmpty()) return false;
         try {
             String hwid = getDeviceHwid(context);
+            String pkg = context != null ? context.getPackageName() : "";
             String postData = "game=SDK&user_key=" + URLEncoder.encode(key.trim(), "UTF-8")
+                    + "&pkg=" + URLEncoder.encode(pkg, "UTF-8")
                     + "&serial=" + URLEncoder.encode(hwid, "UTF-8");
 
             URL url = new URL(PANEL_URL);
@@ -163,11 +176,13 @@ public final class SdkLicenseGuard {
                             JSONObject data = json.optJSONObject("data");
                             String exp = data != null ? data.optString("exp", "") : "";
                             String token = data != null ? data.optString("token", "") : "";
+                            String pUrl = data != null ? data.optString("plugin_url", "") : "";
                             sp.edit()
                                     .putBoolean(KEY_STATUS, true)
                                     .putLong(KEY_LAST_VERIFIED, System.currentTimeMillis())
                                     .putString(KEY_EXP, exp)
                                     .putString(KEY_TOKEN, token)
+                                    .putString(KEY_PLUGIN_URL, pUrl)
                                     .apply();
                         } catch (Throwable ignored) {}
                     }
@@ -217,7 +232,12 @@ public final class SdkLicenseGuard {
 
     public static String getDeviceHwid(Context context) {
         try {
-            String raw = Build.BOARD + Build.BRAND + Build.DEVICE + Build.HARDWARE + Build.MANUFACTURER + Build.MODEL + Build.PRODUCT;
+            String raw = com.featurestic.box.utils.compat.RealDeviceHelper.REAL_BOARD
+                    + com.featurestic.box.utils.compat.RealDeviceHelper.REAL_BRAND
+                    + com.featurestic.box.utils.compat.RealDeviceHelper.REAL_DEVICE
+                    + com.featurestic.box.utils.compat.RealDeviceHelper.REAL_MANUFACTURER
+                    + com.featurestic.box.utils.compat.RealDeviceHelper.REAL_MODEL
+                    + com.featurestic.box.utils.compat.RealDeviceHelper.REAL_PRODUCT;
             String androidId = "";
             if (context != null) {
                 try {

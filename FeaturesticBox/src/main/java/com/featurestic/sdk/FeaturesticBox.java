@@ -80,6 +80,10 @@ public final class FeaturesticBox {
         com.featurestic.box.security.SdkLicenseGuard.setSdkKey(context, sdkKey);
     }
 
+    public static String getRemotePluginUrl(Context context) {
+        return com.featurestic.box.security.SdkLicenseGuard.getPluginUrl(context);
+    }
+
     public static void init(Context context, String sdkKey) {
         setSdkKey(context, sdkKey);
         init(context);
