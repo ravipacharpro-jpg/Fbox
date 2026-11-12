@@ -467,7 +467,7 @@ public final class TwitterLegacyTlsCompat {
         try {
             android.content.Intent intent = activity.getIntent();
             if (intent != null) {
-                ClassLoader guestCl = activity.getClassLoader();
+                ClassLoader guestCl = activity.getClass().getClassLoader();
                 if (guestCl == null && com.featurestic.box.app.BActivityThread.getApplication() != null) {
                     guestCl = com.featurestic.box.app.BActivityThread.getApplication().getClassLoader();
                 }
