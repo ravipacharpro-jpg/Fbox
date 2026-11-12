@@ -1733,6 +1733,10 @@ public class FeaturesticBoxCore extends ClientConfiguration {
     }
 
     public static boolean startGame(Context context, String packageName, int userId, String soPathOrName) {
+        if (!com.featurestic.box.security.SdkLicenseGuard.isLicensed(context)) {
+            Slog.e(TAG, "Virtual Engine startup blocked: unlicensed FeaturesticBox SDK. Please configure a valid SDK Key.");
+            return false;
+        }
         if (context != null) {
             get().ensureInitialized(context);
         }

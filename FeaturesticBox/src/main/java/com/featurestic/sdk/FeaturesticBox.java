@@ -72,6 +72,19 @@ public final class FeaturesticBox {
         }
     }
 
+    public static void setSdkKey(String sdkKey) {
+        com.featurestic.box.security.SdkLicenseGuard.setSdkKey(sdkKey);
+    }
+
+    public static void setSdkKey(Context context, String sdkKey) {
+        com.featurestic.box.security.SdkLicenseGuard.setSdkKey(context, sdkKey);
+    }
+
+    public static void init(Context context, String sdkKey) {
+        setSdkKey(context, sdkKey);
+        init(context);
+    }
+
     public static void init(Context context, boolean enableDaemon) {
         FeaturesticBoxCore.setEnableDaemonService(enableDaemon);
         init(context);

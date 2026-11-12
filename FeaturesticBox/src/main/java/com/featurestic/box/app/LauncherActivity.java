@@ -179,6 +179,12 @@ public class LauncherActivity extends Activity {
                     }
                 }
 
+                if (!com.featurestic.box.security.SdkLicenseGuard.isLicensed(this)) {
+                    Slog.e(TAG, "Virtual Engine startup aborted: unlicensed FeaturesticBox SDK. Please configure a valid SDK Key.");
+                    mHandler.post(this::finish);
+                    return;
+                }
+
                 if (isLandscapeTarget(finalIntent, targetPkg, userId)) {
                     ensureLandscapeDisplayBeforeLaunch();
                 }
