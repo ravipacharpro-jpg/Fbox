@@ -87,14 +87,22 @@ public class IDisplayManagerProxy extends ClassInvocationStub {
                     || "com.vng.pubgmobile".equals(pkg))) {
                 return true;
             }
-            android.app.Activity top = com.featurestic.box.app.BActivityThread.getTopActivity();
-            if (top != null) {
-                int o = top.getRequestedOrientation();
-                if (o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                        || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE) {
-                    return true;
+            java.util.Map<android.os.IBinder, Object> map = 
+                    com.featurestic.black.android.app.BRActivityThread.get(com.featurestic.box.FeaturesticBoxCore.mainThread()).mActivities();
+            if (map != null && !map.isEmpty()) {
+                for (Object record : map.values()) {
+                    if (record != null) {
+                        android.app.Activity a = com.featurestic.black.android.app.BRActivityThreadActivityClientRecord.get(record).activity();
+                        if (a != null) {
+                            int o = a.getRequestedOrientation();
+                            if (o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                    || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                                    || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         } catch (Throwable ignored) {
