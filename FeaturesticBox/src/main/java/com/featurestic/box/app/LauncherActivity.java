@@ -179,6 +179,10 @@ public class LauncherActivity extends Activity {
                     }
                 }
 
+                if (isLandscapeTarget(finalIntent, targetPkg, userId)) {
+                    ensureLandscapeDisplayBeforeLaunch();
+                }
+
                 FeaturesticBoxCore.getBActivityManager().startActivity(finalIntent, userId);
                 mLaunchDispatched = true;
             } catch (Throwable throwable) {
@@ -186,6 +190,46 @@ public class LauncherActivity extends Activity {
                 mHandler.post(this::finish);
             }
         }, "FeaturesticLaunch").start(), 260L);
+    }
+
+    private boolean isLandscapeTarget(Intent intent, String pkg, int userId) {
+        if (pkg != null && (pkg.startsWith("com.pubg.")
+                || "com.tencent.ig".equals(pkg)
+                || "com.rekoo.pubgm".equals(pkg)
+                || "com.vng.pubgmobile".equals(pkg))) {
+            return true;
+        }
+        try {
+            if (intent != null) {
+                android.content.pm.ResolveInfo ri = FeaturesticBoxCore.getBPackageManager().resolveActivity(
+                        intent, 0, null, userId);
+                if (ri != null && ri.activityInfo != null) {
+                    int o = ri.activityInfo.screenOrientation;
+                    return o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                            || o == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private void ensureLandscapeDisplayBeforeLaunch() {
+        try {
+            mHandler.post(() -> {
+                try {
+                    if (!isFinishing() && !isDestroyed()) {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                    }
+                } catch (Throwable ignored) {
+                }
+            });
+            Thread.sleep(360L);
+            com.featurestic.box.fake.service.IDisplayManagerProxy.flushDisplayInfoCache();
+        } catch (Throwable ignored) {
+        }
     }
 
     private void startRingRotation(View ringView) {

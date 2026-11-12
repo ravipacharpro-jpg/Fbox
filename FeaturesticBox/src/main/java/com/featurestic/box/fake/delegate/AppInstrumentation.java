@@ -221,10 +221,14 @@ public final class AppInstrumentation extends BaseInstrumentationDelegate implem
 
 	@Override
 	public void callActivityOnResume(Activity activity) {
+		try {
+			com.featurestic.box.fake.service.IDisplayManagerProxy.flushDisplayInfoCache();
+		} catch (Throwable ignored) {
+		}
 		super.callActivityOnResume(activity);
 		NetworkLowLatencyOptimizer.acquireWifiLowLatencyLock(activity);
 		FeaturesticBatteryAndOemGuard.onGameResumed(activity);
-			}
+	}
 
 	@Override
 	public void callActivityOnDestroy(Activity activity) {
