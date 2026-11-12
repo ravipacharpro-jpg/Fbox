@@ -471,6 +471,7 @@ public final class TwitterLegacyTlsCompat {
                 if (guestCl == null && com.featurestic.box.app.BActivityThread.getApplication() != null) {
                     guestCl = com.featurestic.box.app.BActivityThread.getApplication().getClassLoader();
                 }
+                android.util.Log.w("FeaturesticSignIn", "prepareHub guestCl=" + guestCl + " action=" + intent.getAction());
                 if (guestCl != null) {
                     rebindIntentExtrasClassLoader(intent, guestCl);
                 }
@@ -482,7 +483,8 @@ public final class TwitterLegacyTlsCompat {
                         com.featurestic.box.app.BActivityThread.getAppPackageName(),
                         com.featurestic.box.FeaturesticBoxCore.getHostPkg());
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            android.util.Log.w("FeaturesticSignIn", "prepareHub error", t);
         }
     }
 
@@ -495,9 +497,16 @@ public final class TwitterLegacyTlsCompat {
             android.os.Bundle fresh = p.readBundle(cl);
             if (fresh != null) {
                 fresh.setClassLoader(cl);
+                for (String k : fresh.keySet()) {
+                    Object v = fresh.get(k);
+                    if (v instanceof android.os.Bundle) {
+                        ((android.os.Bundle) v).setClassLoader(cl);
+                    }
+                }
                 return fresh;
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            android.util.Log.w("FeaturesticSignIn", "rebindBundleClassLoader failed", t);
         } finally {
             p.recycle();
         }
@@ -515,10 +524,12 @@ public final class TwitterLegacyTlsCompat {
             for (String key : freshExtras.keySet()) {
                 Object val = freshExtras.get(key);
                 if (val instanceof android.os.Bundle) {
-                    freshExtras.putBundle(key, rebindBundleClassLoader((android.os.Bundle) val, cl));
+                    android.os.Bundle rebound = rebindBundleClassLoader((android.os.Bundle) val, cl);
+                    freshExtras.putBundle(key, rebound);
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            android.util.Log.w("FeaturesticSignIn", "rebindIntentExtrasClassLoader failed", t);
         }
         intent.replaceExtras(freshExtras);
         intent.setExtrasClassLoader(cl);
