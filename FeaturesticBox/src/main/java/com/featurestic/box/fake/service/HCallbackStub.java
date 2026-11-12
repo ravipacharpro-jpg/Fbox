@@ -255,7 +255,21 @@ public class HCallbackStub implements IInjectHook, Handler.Callback {
 
         if (BActivityThread.getApplication() != null
                 && BActivityThread.getApplication().getClassLoader() != null) {
-            targetIntent.setExtrasClassLoader(BActivityThread.getApplication().getClassLoader());
+            ClassLoader guestCl = BActivityThread.getApplication().getClassLoader();
+            targetIntent.setExtrasClassLoader(guestCl);
+            try {
+                android.os.Bundle extras = targetIntent.getExtras();
+                if (extras != null) {
+                    extras.setClassLoader(guestCl);
+                    for (String key : extras.keySet()) {
+                        Object val = extras.get(key);
+                        if (val instanceof android.os.Bundle) {
+                            ((android.os.Bundle) val).setClassLoader(guestCl);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
         }
         int taskId = resolveTaskIdSafely(token);
         FeaturesticBoxCore.getBActivityManager().onActivityCreated(

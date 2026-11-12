@@ -415,9 +415,22 @@ public final class TwitterLegacyTlsCompat {
         try {
             android.content.Intent intent = activity.getIntent();
             if (intent != null) {
-                if (com.featurestic.box.app.BActivityThread.getApplication() != null) {
-                    intent.setExtrasClassLoader(
-                            com.featurestic.box.app.BActivityThread.getApplication().getClassLoader());
+                ClassLoader guestCl = activity.getClassLoader();
+                if (guestCl == null && com.featurestic.box.app.BActivityThread.getApplication() != null) {
+                    guestCl = com.featurestic.box.app.BActivityThread.getApplication().getClassLoader();
+                }
+                if (guestCl != null) {
+                    intent.setExtrasClassLoader(guestCl);
+                    android.os.Bundle extras = intent.getExtras();
+                    if (extras != null) {
+                        extras.setClassLoader(guestCl);
+                        for (String key : extras.keySet()) {
+                            Object val = extras.get(key);
+                            if (val instanceof android.os.Bundle) {
+                                ((android.os.Bundle) val).setClassLoader(guestCl);
+                            }
+                        }
+                    }
                 }
                 if ("com.google.android.gms.auth.NO_IMPL".equals(intent.getAction())) {
                     intent.setAction("com.google.android.gms.auth.GOOGLE_SIGN_IN");
