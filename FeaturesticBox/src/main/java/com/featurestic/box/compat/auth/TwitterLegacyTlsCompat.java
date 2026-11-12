@@ -472,17 +472,7 @@ public final class TwitterLegacyTlsCompat {
                     guestCl = com.featurestic.box.app.BActivityThread.getApplication().getClassLoader();
                 }
                 if (guestCl != null) {
-                    intent.setExtrasClassLoader(guestCl);
-                    android.os.Bundle extras = intent.getExtras();
-                    if (extras != null) {
-                        extras.setClassLoader(guestCl);
-                        for (String key : extras.keySet()) {
-                            Object val = extras.get(key);
-                            if (val instanceof android.os.Bundle) {
-                                ((android.os.Bundle) val).setClassLoader(guestCl);
-                            }
-                        }
-                    }
+                    rebindIntentExtrasClassLoader(intent, guestCl);
                 }
                 if ("com.google.android.gms.auth.NO_IMPL".equals(intent.getAction())) {
                     intent.setAction("com.google.android.gms.auth.GOOGLE_SIGN_IN");
@@ -494,6 +484,44 @@ public final class TwitterLegacyTlsCompat {
             }
         } catch (Throwable ignored) {
         }
+    }
+
+    private static android.os.Bundle rebindBundleClassLoader(android.os.Bundle src, ClassLoader cl) {
+        if (src == null || cl == null) return src;
+        android.os.Parcel p = android.os.Parcel.obtain();
+        try {
+            src.writeToParcel(p, 0);
+            p.setDataPosition(0);
+            android.os.Bundle fresh = p.readBundle(cl);
+            if (fresh != null) {
+                fresh.setClassLoader(cl);
+                return fresh;
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            p.recycle();
+        }
+        src.setClassLoader(cl);
+        return src;
+    }
+
+    private static void rebindIntentExtrasClassLoader(android.content.Intent intent, ClassLoader cl) {
+        if (intent == null || cl == null) return;
+        intent.setExtrasClassLoader(cl);
+        android.os.Bundle extras = intent.getExtras();
+        if (extras == null) return;
+        android.os.Bundle freshExtras = rebindBundleClassLoader(extras, cl);
+        try {
+            for (String key : freshExtras.keySet()) {
+                Object val = freshExtras.get(key);
+                if (val instanceof android.os.Bundle) {
+                    freshExtras.putBundle(key, rebindBundleClassLoader((android.os.Bundle) val, cl));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        intent.replaceExtras(freshExtras);
+        intent.setExtrasClassLoader(cl);
     }
 
     public static void configureCompactPopupActivityWindow(Activity activity) {
