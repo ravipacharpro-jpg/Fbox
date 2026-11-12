@@ -14,6 +14,8 @@ public final class RealDeviceHelper {
     public static final String REAL_MODEL;
     public static final String REAL_DEVICE;
     public static final String REAL_PRODUCT;
+    public static final String REAL_BOARD;
+    public static final String REAL_HARDWARE;
     public static final String REAL_ANDROID_VERSION;
     public static final int REAL_SDK_INT;
 
@@ -23,6 +25,8 @@ public final class RealDeviceHelper {
         String mo = Build.MODEL;
         String d = Build.DEVICE;
         String p = Build.PRODUCT;
+        String bo = Build.BOARD;
+        String h = Build.HARDWARE;
         String v = Build.VERSION.RELEASE;
         int sdk = Build.VERSION.SDK_INT;
 
@@ -54,6 +58,8 @@ public final class RealDeviceHelper {
         REAL_MODEL = mo;
         REAL_DEVICE = d;
         REAL_PRODUCT = p;
+        REAL_BOARD = bo;
+        REAL_HARDWARE = h;
         REAL_ANDROID_VERSION = v;
         REAL_SDK_INT = sdk;
     }
