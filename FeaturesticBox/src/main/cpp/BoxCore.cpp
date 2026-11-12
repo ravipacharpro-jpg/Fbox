@@ -131,11 +131,37 @@ static void nativePrepareLibrarySegments(JNIEnv *env, jclass /*clazz*/, jstring 
     if (libC != nullptr) env->ReleaseStringUTFChars(libPathOrName, libC);
 }
 
+static jboolean nativeCanResolveArtField(JNIEnv *env, jclass /*clazz*/) {
+    if (env == nullptr) return JNI_FALSE;
+    jclass fieldClass = env->FindClass("java/lang/reflect/Field");
+    if (fieldClass == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    jmethodID getArtField = env->GetMethodID(fieldClass, "getArtField", "()J");
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(fieldClass);
+    if (getArtField == nullptr) {
+        return JNI_FALSE;
+    }
+
+    jclass execClass = env->FindClass("java/lang/reflect/Executable");
+    if (execClass == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    jfieldID artMethod = env->GetFieldID(execClass, "artMethod", "J");
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(execClass);
+    return (artMethod != nullptr) ? JNI_TRUE : JNI_FALSE;
+}
+
 static JNINativeMethod gMethods[] = {
         {"nativeInitAnogsRuntime", "(I)V", reinterpret_cast<void *>(nativeInitAnogsRuntime)},
         {"nativeSyncIORule", "(Ljava/lang/String;Ljava/lang/String;)V", reinterpret_cast<void *>(nativeSyncIORule)},
         {"nativeEnableNativeIO", "()V", reinterpret_cast<void *>(nativeEnableNativeIO)},
         {"nativePrepareLibrarySegments", "(Ljava/lang/String;)V", reinterpret_cast<void *>(nativePrepareLibrarySegments)},
+        {"nativeCanResolveArtField", "()Z", reinterpret_cast<void *>(nativeCanResolveArtField)},
 };
 
 static int registerNativeMethods(JNIEnv *env, const char *className,

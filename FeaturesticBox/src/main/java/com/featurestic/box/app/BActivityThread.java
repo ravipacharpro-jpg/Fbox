@@ -524,6 +524,10 @@ public class BActivityThread extends IBActivityThread.Stub {
         } catch (Throwable ignored) {
         }
 
+        try {
+            com.featurestic.box.utils.compat.HiddenApiReflection.unseal(packageContext);
+        } catch (Throwable ignored) {
+        }
         RNative.init(Build.VERSION.SDK_INT);
         assert packageContext != null;
         RCore.get().enableRedirect(packageContext);

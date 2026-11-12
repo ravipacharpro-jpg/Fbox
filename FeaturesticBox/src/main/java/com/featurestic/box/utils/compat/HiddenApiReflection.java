@@ -71,7 +71,7 @@ public final class HiddenApiReflection {
             Class<?> vmRuntimeClass = (Class<?>) forName.invoke(null, "dalvik.system.VMRuntime");
             Method getRuntime = (Method) getDeclaredMethod.invoke(vmRuntimeClass, "getRuntime", null);
             Method setHiddenApiExemptions = (Method) getDeclaredMethod.invoke(
-                    vmRuntimeClass, "setHiddenApiExemptions", new Object[]{new Class[]{String[].class}});
+                    vmRuntimeClass, "setHiddenApiExemptions", (Object) new Class[]{String[].class});
             getRuntime.setAccessible(true);
             setHiddenApiExemptions.setAccessible(true);
             Object vmRuntime = getRuntime.invoke(null);
@@ -94,6 +94,6 @@ public final class HiddenApiReflection {
     }
 
     public static boolean exemptAll() {
-        return exempt(new String[]{"L"});
+        return exempt(new String[]{"", "L"});
     }
 }

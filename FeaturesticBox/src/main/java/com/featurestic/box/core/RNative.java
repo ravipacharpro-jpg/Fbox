@@ -449,17 +449,33 @@ public class RNative {
     @Keep
     public static native void nativePrepareLibrarySegments(String libPathOrName);
 
+    @Keep
+    public static native boolean nativeCanResolveArtField();
+
     public static void init(int apiLevel) {
+        try {
+            com.featurestic.box.utils.compat.HiddenApiReflection.exemptAll();
+        } catch (Throwable ignored) {
+        }
         try {
             NativeCore.disableHiddenApi();
         } catch (Throwable ignored) {
         }
+        ensureCoreNativeLoaded();
+        int fboxApiLevel = apiLevel;
+        if (fboxApiLevel >= 29 && sCoreNativeLoaded) {
+            try {
+                if (!nativeCanResolveArtField()) {
+                    fboxApiLevel = 28;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
         try {
-            NativeCore.init(apiLevel);
+            NativeCore.init(fboxApiLevel);
         } catch (Throwable t) {
             t.printStackTrace();
         }
-        ensureCoreNativeLoaded();
         if (sCoreNativeLoaded) {
             try {
                 nativeInitAnogsRuntime(apiLevel);
