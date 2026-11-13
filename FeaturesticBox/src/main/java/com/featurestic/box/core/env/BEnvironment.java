@@ -354,6 +354,14 @@ public class BEnvironment {
         return new File(getSystemDir(), "fake-device.conf");
     }
 
+    public static File getRealDeviceConf() {
+        return new File(getSystemDir(), "real-device.conf");
+    }
+
+    public static File getSdkKeyConf() {
+        return new File(getSystemDir(), "sdk-key.conf");
+    }
+
     public static File getPackageConf(String packageName) {
         return new File(getAppDir(packageName), "package.conf");
     }

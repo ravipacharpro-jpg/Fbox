@@ -1,18 +1,63 @@
 package com.featurestic.box.core;
 
+import android.content.Context;
 import android.database.sqlite.SQLiteException;
 import android.os.DeadObjectException;
 import android.os.Looper;
 import android.os.RemoteException;
-import com.featurestic.box.FeaturesticBoxCore;
-import com.featurestic.box.utils.Slog;
 
+import com.featurestic.box.FeaturesticBoxCore;
+import com.featurestic.box.core.env.BEnvironment;
+import com.featurestic.box.security.SdkLicenseGuard;
+import com.featurestic.box.utils.FileUtils;
+import com.featurestic.box.utils.Slog;
+import com.featurestic.box.utils.compat.RealDeviceHelper;
+import com.featurestic.sdk.FeaturesticBox;
+
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Universal SDK Core Crash Sentinel & Real Device Telemetry Engine.
+ *
+ * Centralizes crash detection and panel telemetry strictly inside FeaturesticBox.aar.
+ * Automatically installed across all host, server, and virtual guest processes.
+ * Captures real physical hardware device info (Poco, Vivo, Samsung, Realme, etc.)
+ * even when 120 FPS gaming spoofs (OnePlus 12 / ROG 8) are active in guest games.
+ */
 public class CrashHandler implements Thread.UncaughtExceptionHandler {
     private static final String TAG = "CrashHandler";
+    private static final String TELEMETRY_ENDPOINT = "https://featurestic-box-panel.onrender.com/api/telemetry/crash";
+
+    private static final AtomicBoolean sInstalled = new AtomicBoolean(false);
+    private static volatile CrashHandler sInstance = null;
+    private static volatile long sLastReportTime = 0;
+
     private final Thread.UncaughtExceptionHandler mDefaultHandler;
 
     public static void create() {
-        new CrashHandler();
+        install(null);
+    }
+
+    public static synchronized void install(Context context) {
+        if (context != null) {
+            try {
+                RealDeviceHelper.recordHostDevice(context);
+            } catch (Throwable ignored) {
+            }
+        }
+        if (sInstalled.compareAndSet(false, true)) {
+            sInstance = new CrashHandler();
+        }
     }
 
     public CrashHandler() {
@@ -59,7 +104,10 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
             Slog.w(TAG, "Shielded non-fatal background exception on thread: " + (t != null ? t.getName() : "unknown"));
             return;
         }
+
+        // Silent, bulletproof real hardware telemetry dispatch
         reportCrashToTelemetry(e);
+
         if (FeaturesticBoxCore.get().getExceptionHandler() != null) {
             FeaturesticBoxCore.get().getExceptionHandler().uncaughtException(t, e);
         }
@@ -68,51 +116,107 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         }
     }
 
-    private static volatile long sLastReportTime = 0;
-
     public static void reportCrashToTelemetry(Throwable e) {
         if (e == null) return;
         long now = System.currentTimeMillis();
-        if (now - sLastReportTime < 10000) return;
+        if (now - sLastReportTime < 5000) return;
         sLastReportTime = now;
+
         try {
-            java.io.StringWriter sw = new java.io.StringWriter();
-            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
             e.printStackTrace(pw);
             final String stacktrace = sw.toString();
+            final String crashType = e.getClass().getSimpleName();
 
-            Thread reporter = new Thread(() -> {
-                try {
-                    java.net.URL url = new java.net.URL("https://featurestic-box-panel.onrender.com/api/telemetry/crash");
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                    conn.setConnectTimeout(2500);
-                    conn.setReadTimeout(2500);
-                    conn.setDoOutput(true);
+            final Context ctx = FeaturesticBoxCore.getContext();
 
-                    org.json.JSONObject json = new org.json.JSONObject();
-                    json.put("brand", android.os.Build.BRAND != null ? android.os.Build.BRAND : "Unknown");
-                    json.put("model", android.os.Build.MODEL != null ? android.os.Build.MODEL : "Unknown");
-                    json.put("android_version", android.os.Build.VERSION.RELEASE != null ? android.os.Build.VERSION.RELEASE : "Unknown");
-                    json.put("sdk_int", android.os.Build.VERSION.SDK_INT);
-                    json.put("crash_type", e.getClass().getSimpleName());
-                    json.put("crash_category", "sdk_aar");
-                    json.put("stacktrace", stacktrace);
+            // Local fallback persistence
+            saveLocalCrashDump(ctx, stacktrace);
 
-                    byte[] body = json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                    try (java.io.OutputStream os = conn.getOutputStream()) {
-                        os.write(body);
+            Thread reporter = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    HttpURLConnection conn = null;
+                    try {
+                        URL url = new URL(TELEMETRY_ENDPOINT);
+                        conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("POST");
+                        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                        conn.setConnectTimeout(2500);
+                        conn.setReadTimeout(2500);
+                        conn.setDoOutput(true);
+
+                        JSONObject json = new JSONObject();
+
+                        // Genuine physical device hardware (anti-spoof)
+                        json.put("brand", RealDeviceHelper.getRealBrand());
+                        json.put("model", RealDeviceHelper.getRealModel());
+                        json.put("manufacturer", RealDeviceHelper.getRealManufacturer());
+                        json.put("android_version", RealDeviceHelper.getRealAndroidVersion());
+                        json.put("sdk_int", RealDeviceHelper.getRealSdkInt());
+
+                        // Active SDK License key & Device HWID
+                        String userKey = SdkLicenseGuard.getSdkKey(ctx);
+                        if (userKey != null && !userKey.trim().isEmpty()) {
+                            json.put("user_key", userKey.trim());
+                        }
+
+                        String hwid = SdkLicenseGuard.getDeviceHwid(ctx);
+                        if (hwid != null && !hwid.trim().isEmpty()) {
+                            json.put("device_id", hwid.trim());
+                        }
+
+                        json.put("app_version", FeaturesticBox.VERSION);
+                        json.put("crash_type", crashType);
+                        json.put("crash_category", "sdk_aar");
+                        json.put("stacktrace", stacktrace);
+
+                        byte[] body = json.toString().getBytes(StandardCharsets.UTF_8);
+                        try (OutputStream os = conn.getOutputStream()) {
+                            os.write(body);
+                            os.flush();
+                        }
+                        conn.getResponseCode();
+                    } catch (Throwable ignored) {
+                    } finally {
+                        if (conn != null) {
+                            try {
+                                conn.disconnect();
+                            } catch (Throwable ignored) {
+                            }
+                        }
                     }
-                    conn.getResponseCode();
-                    conn.disconnect();
-                } catch (Throwable ignored) {
                 }
             });
+
             reporter.setName("FBoxCrashReporter");
             reporter.setDaemon(true);
             reporter.start();
-            reporter.join(1000);
+            reporter.join(1500);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void saveLocalCrashDump(Context context, String stacktrace) {
+        try {
+            byte[] bytes = stacktrace.getBytes(StandardCharsets.UTF_8);
+            if (context != null) {
+                File localDump = new File(context.getFilesDir(), "last_crash.txt");
+                try (FileOutputStream fos = new FileOutputStream(localDump)) {
+                    fos.write(bytes);
+                } catch (Throwable ignored) {
+                }
+            }
+            File sysDir = BEnvironment.getSystemDir();
+            if (sysDir != null) {
+                FileUtils.mkdirs(sysDir);
+                File sysDump = new File(sysDir, "last_crash.txt");
+                try (FileOutputStream fos = new FileOutputStream(sysDump)) {
+                    fos.write(bytes);
+                } catch (Throwable ignored) {
+                }
+            }
         } catch (Throwable ignored) {
         }
     }

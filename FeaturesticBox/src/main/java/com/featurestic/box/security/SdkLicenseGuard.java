@@ -57,10 +57,22 @@ public final class SdkLicenseGuard {
 
     public static void setSdkKey(Context context, String key) {
         setSdkKey(key);
-        if (context != null && key != null && !key.trim().isEmpty()) {
+        if (key != null && !key.trim().isEmpty()) {
+            final String clean = key.trim();
+            if (context != null) {
+                try {
+                    SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+                    sp.edit().putString(KEY_SDK_KEY, clean).apply();
+                } catch (Throwable ignored) {}
+            }
             try {
-                SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-                sp.edit().putString(KEY_SDK_KEY, key.trim()).apply();
+                java.io.File keyFile = com.featurestic.box.core.env.BEnvironment.getSdkKeyConf();
+                if (keyFile != null) {
+                    com.featurestic.box.utils.FileUtils.mkdirs(keyFile.getParentFile());
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(keyFile)) {
+                        fos.write(clean.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                }
             } catch (Throwable ignored) {}
         }
     }
@@ -69,25 +81,46 @@ public final class SdkLicenseGuard {
         if (sSdkKey != null && !sSdkKey.isEmpty()) {
             return sSdkKey;
         }
-        if (context == null) return "";
-        try {
-            SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-            String saved = sp.getString(KEY_SDK_KEY, "");
-            if (!saved.isEmpty()) {
-                sSdkKey = saved;
-                return sSdkKey;
-            }
-            // Check AndroidManifest meta-data
-            ApplicationInfo ai = context.getPackageManager().getApplicationInfo(
-                    context.getPackageName(), PackageManager.GET_META_DATA);
-            if (ai != null && ai.metaData != null) {
-                String meta = ai.metaData.getString("featurestic_sdk_key", "");
-                if (!meta.isEmpty()) {
-                    sSdkKey = meta;
+        if (context != null) {
+            try {
+                SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+                String saved = sp.getString(KEY_SDK_KEY, "");
+                if (!saved.isEmpty()) {
+                    sSdkKey = saved;
                     return sSdkKey;
+                }
+            } catch (Throwable ignored) {}
+        }
+        try {
+            java.io.File keyFile = com.featurestic.box.core.env.BEnvironment.getSdkKeyConf();
+            if (keyFile != null && keyFile.isFile() && keyFile.length() > 0) {
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(keyFile)) {
+                    byte[] buf = new byte[(int) keyFile.length()];
+                    int len = fis.read(buf);
+                    if (len > 0) {
+                        String k = new String(buf, 0, len, java.nio.charset.StandardCharsets.UTF_8).trim();
+                        if (!k.isEmpty()) {
+                            sSdkKey = k;
+                            return sSdkKey;
+                        }
+                    }
                 }
             }
         } catch (Throwable ignored) {}
+        if (context != null) {
+            try {
+                // Check AndroidManifest meta-data
+                ApplicationInfo ai = context.getPackageManager().getApplicationInfo(
+                        context.getPackageName(), PackageManager.GET_META_DATA);
+                if (ai != null && ai.metaData != null) {
+                    String meta = ai.metaData.getString("featurestic_sdk_key", "");
+                    if (!meta.isEmpty()) {
+                        sSdkKey = meta;
+                        return sSdkKey;
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
         return "";
     }
 

@@ -417,6 +417,10 @@ public class FeaturesticBoxCore extends ClientConfiguration {
         }
 
         if (isMainProcess() || isServerProcess()) {
+            try {
+                com.featurestic.box.utils.compat.RealDeviceHelper.recordHostDevice(getContext());
+            } catch (Throwable ignored) {
+            }
             if (BEnvironment.sEnableDaemonService) {
                 try {
                     Intent intent = new Intent();
@@ -429,6 +433,10 @@ public class FeaturesticBoxCore extends ClientConfiguration {
                 } catch (Throwable ignored) {
                 }
             }
+        }
+        try {
+            com.featurestic.box.core.CrashHandler.install(getContext());
+        } catch (Throwable ignored) {
         }
         try {
             HookManager.get().init();
