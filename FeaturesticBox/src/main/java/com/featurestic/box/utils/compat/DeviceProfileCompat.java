@@ -97,7 +97,7 @@ public final class DeviceProfileCompat {
                 }
                 applyProps(props);
             } else {
-                setPreset(PRESET_ROG_PHONE_8);
+                setPreset(PRESET_ONEPLUS_12);
             }
         } catch (Throwable ignored) {
         }
