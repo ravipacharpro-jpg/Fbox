@@ -97,7 +97,16 @@ public final class DeviceProfileCompat {
                 }
                 applyProps(props);
             } else {
-                setPreset(PRESET_ONEPLUS_12);
+                String[] presets = new String[]{
+                    PRESET_ONEPLUS_12,
+                    PRESET_ROG_PHONE_8,
+                    PRESET_IQOO_12,
+                    PRESET_S24_ULTRA,
+                    PRESET_REDMAGIC_9_PRO,
+                    PRESET_XIAOMI_14_PRO
+                };
+                int idx = (int) (Math.random() * presets.length);
+                setPreset(presets[idx]);
             }
         } catch (Throwable ignored) {
         }
